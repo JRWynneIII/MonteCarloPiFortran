@@ -6,8 +6,8 @@
                 inCircle = 0
                 niter = 100000
                 
-                call utime(time)
-                call init_random_seed(time)
+                call time(time)
+                call random_seed(time)
 
                 do i=0,niter
                         call random_number(x)
@@ -19,4 +19,5 @@
                 enddo
                 
                 pi = 4*(inCircle/niter)
+                print*,pi
         end program
