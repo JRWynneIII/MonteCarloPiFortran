@@ -1,0 +1,66 @@
+module kernel
+  contains 
+  attributes(global) subroutine MonteCarlo(count_d, randomnums_d)
+    integer::i,tid,xidx,yidx
+    real(8),device :: count_d,randomnums_d
+    real(8)::x,y,z    
+
+    tid = blockDim%x * blockIdx%x + threadIdx%x
+    xidx = tid + tid
+    yidx = xidx +1
+    x = randomnums_d(xidx)
+    y = randomnums_d(yidx)
+    z = ((x*x)+(y*y))
+
+    if (z<=1) then
+      count_d(tid) = 1
+    else
+      count_d(tid) = 0
+    end if
+  end subroutine
+end module
+
+program cudafortmcpi
+  use cudafor
+  use kernel
+  
+  integer :: niter
+  integer :: i
+  integer :: blocks = 100
+  integer :: threadsperblock = 1000
+  integer :: inCircle = 0
+  real(8) :: pi
+  real(8),dimension(:),allocatable :: randomnums_h
+  real(8),device,dimension(:),allocatable :: randomnums_d
+  real(8),dimension(:),allocatable :: count_h
+  real(8),device,dimension(:),allocatable :: count_d
+  niter = 100000
+  i = 0
+  pi = 0
+
+  allocate(randomnums_h(2*niter))
+  allocate(randomnums_d(2*niter))
+  allocate(count_h(niter))
+  allocate(count_d(niter))
+
+  !fill the array with random numbers
+  call random_seed(call time)
+  call random_number(randomnums_h)
+  
+  !copy over randomnums to the device. this is done implicitly
+  randomnums_d = randomnums_h(0:(2*niter)) 
+
+  !Call the kernel
+  call MonteCarlo<<<blocks,threadsperblock>>>(count_d, randomnums_d)
+
+  !Copy back the results from count_d. again this is done implicitly
+  count_h = count_d(0:niter)
+
+  do i=0,niter
+    inCircle = inCircle + count_h(i)
+  enddo
+
+  pi = 4*(inCircle/niter)
+  print*, pi
+end program
+
