@@ -1,6 +1,8 @@
 module kernel
   contains 
   attributes(global) subroutine MonteCarlo(count_d, randomnums_d)
+    use cudafor
+
     implicit none
     integer :: niter = 100000
     integer::i,tid,xidx,yidx
@@ -19,26 +21,25 @@ module kernel
     else
       count_d(tid) = 0
     end if
-  end subroutine
-end module
+  end subroutine MonteCarlo
+end module kernel
 
 program cudafortmcpi
   use cudafor
   use kernel
   
   implicit none
-  integer :: niter = 100000
+  real(8) :: niter = 100000
   integer :: i = 0
   integer :: rnarraysize = 200000
-  integer :: blocks = 100
-  integer :: threadsperblock = 1000
-  integer :: inCircle = 0
+  real(8) :: inCircle = 0
   integer :: seed = 0
   real(8) :: pi = 0
   real(8),dimension(:),allocatable :: randomnums_h
   real(8),device,dimension(:),allocatable :: randomnums_d
   real(8),dimension(:),allocatable :: count_h
   real(8),device,dimension(:),allocatable :: count_d
+  type(dim3) :: blockSize, gridSize
 
   allocate(randomnums_h(rnarraysize))
   allocate(randomnums_d(rnarraysize))
@@ -49,17 +50,18 @@ program cudafortmcpi
   call time(seed)
   call random_seed(seed)
   call random_number(randomnums_h)
+
+  blockSize = dim3(1000,1,1)
+  gridSize = dim3(100,1,1)
   
   !copy over randomnums to the device. this is done implicitly
   randomnums_d = randomnums_h
 
   !Call the kernel
-  call MonteCarlo<<<blocks,threadsperblock>>>(count_d, randomnums_d)
+  call MonteCarlo<<<gridSize,blockSize>>>(count_d, randomnums_d)
 
-  print *, "Before count_d transfer"
   !Copy back the results from count_d. again this is done implicitly
   count_h = count_d
-  print *, "After count_d transfer"
 
   do i=1,niter
     inCircle = inCircle + count_h(i)
@@ -67,5 +69,5 @@ program cudafortmcpi
 
   pi = 4*(inCircle/niter)
   print*, pi
-end program
+end program cudafortmcpi
 
